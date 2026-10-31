@@ -1,4 +1,4 @@
-"""Бизнес-логика: кэш, резолвер, фичи, пайплайн обработки запроса."""
+
 import base64
 import json
 import logging
@@ -20,9 +20,6 @@ from config import (
 log = logging.getLogger(__name__)
 
 
-# ===========================================================================
-# Кэш (JSON, без pickle — безопаснее)
-# ===========================================================================
 @dataclass
 class _Entry:
     expire: float
@@ -95,9 +92,6 @@ class DNSCache:
             log.warning("[КЭШ] Не удалось сохранить: %s", e)
 
 
-# ===========================================================================
-# Итеративный резолвер
-# ===========================================================================
 class Resolver:
     def __init__(self, cfg: Config):
         self._cfg = cfg
@@ -176,9 +170,6 @@ class Resolver:
             sock.close()
 
 
-# ===========================================================================
-# Плагины-фичи
-# ===========================================================================
 @dataclass
 class QueryContext:
     req_id: int
@@ -222,9 +213,6 @@ def _run_features(ctx: QueryContext) -> Optional[bytes]:
     return None
 
 
-# ===========================================================================
-# Пайплайн обработки одного запроса
-# ===========================================================================
 class RequestHandler:
     def __init__(self, cfg: Config, cache: DNSCache, resolver: Resolver):
         self._cfg = cfg
@@ -249,26 +237,23 @@ class RequestHandler:
         except proto.DNSFormatError:
             return self._error(request, RCODE_FORMERR, b"")
 
-        # 1. Кэш
         cached = self._cache.get(q.qname, q.qtype, q.qclass)
         if cached is not None:
             log.info("[КЭШ] ХИТ: %s (тип %d)", q.qname, q.qtype)
             return self._to_client(cached, pkt.id, pkt.flags)
 
-        # 2. Плагины
         ctx = QueryContext(pkt.id, q.qname, q.qtype, q.qclass,
                            question_bytes, pkt.flags)
         custom = _run_features(ctx)
         if custom is not None:
             return custom
 
-        # 3. Резолв
         log.info("[СЕТЬ] Резолв %s (тип %d)", q.qname, q.qtype)
         response = self._resolver.resolve(q.qname, q.qtype, q.qclass)
         if response is None:
             return self._error(request, RCODE_SERVFAIL, question_bytes)
 
-        # 4. Кэшируем
+
         try:
             rp = proto.parse_packet(response)
             ttl = self._extract_ttl(rp)
@@ -291,7 +276,6 @@ class RequestHandler:
         ttls = [rr.ttl for rr in pkt.answers if rr.ttl > 0]
         if ttls:
             return min(ttls)
-        # Отрицательное кэширование по SOA MINIMUM
         for rr in pkt.authorities:
             if rr.rtype == TYPE_SOA and len(rr.rdata) >= 4:
                 minimum = struct.unpack("!I", rr.rdata[-4:])[0]

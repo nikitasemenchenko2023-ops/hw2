@@ -1,4 +1,4 @@
-"""Разбор и сборка DNS-пакетов (RFC 1035)."""
+
 import struct
 from dataclasses import dataclass, field
 from typing import Optional
@@ -9,8 +9,7 @@ from config import (
 )
 
 
-class DNSFormatError(ValueError):
-    """Некорректный DNS-пакет."""
+
 
 
 @dataclass
@@ -27,7 +26,7 @@ class DNSRecord:
     rclass: int
     ttl: int
     rdata: bytes
-    target: Optional[str] = None  # для NS/CNAME
+    target: Optional[str] = None  
 
     @property
     def address(self) -> Optional[str]:
@@ -49,8 +48,6 @@ class DNSPacket:
     def rcode(self) -> int:
         return self.flags & 0x0F
 
-
-# --- Парсинг ---------------------------------------------------------------
 
 def parse_qname(data: bytes, offset: int) -> tuple[str, int]:
     labels, curr, visited = [], offset, set()
@@ -124,7 +121,6 @@ def parse_packet(data: bytes) -> DNSPacket:
     return pkt
 
 
-# --- Сборка ---------------------------------------------------------------
 
 def encode_qname(name: str) -> bytes:
     out = b""
@@ -157,5 +153,4 @@ def build_answer_a(ip: str, ttl: int, name_offset: int = 12) -> bytes:
 
 
 def response_flags(request_flags: int, rcode: int) -> int:
-    """QR + RA + RD клиента (мы — рекурсивный сервер)."""
     return FLAG_QR | FLAG_RA | (request_flags & FLAG_RD) | (rcode & 0x0F)

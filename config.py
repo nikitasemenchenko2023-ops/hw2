@@ -1,8 +1,6 @@
-"""Конфигурация и константы."""
 import os
 from dataclasses import dataclass
 
-# --- DNS константы ---
 TYPE_A = 1
 TYPE_NS = 2
 TYPE_CNAME = 5

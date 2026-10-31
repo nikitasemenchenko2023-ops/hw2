@@ -1,4 +1,4 @@
-"""UDP/TCP листенеры, точка входа."""
+
 import logging
 import signal
 import socket
@@ -32,7 +32,6 @@ class DNSServer:
         self._stop.set()
         self._pool.shutdown(wait=False)
 
-    # --- UDP -----------------------------------------------------------
     def _run_udp(self) -> None:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -65,7 +64,6 @@ class DNSServer:
         except Exception:
             log.exception("[UDP] Ошибка обработки от %s", addr)
 
-    # --- TCP -----------------------------------------------------------
     def _run_tcp(self) -> None:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
