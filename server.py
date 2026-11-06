@@ -9,7 +9,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 from config import Config
-from core import DNSCache, RequestHandler, Resolver
+from core import RequestHandler, Resolver
 
 log = logging.getLogger("server")
 
@@ -133,10 +133,8 @@ def main() -> None:
     )
     cfg = Config.from_env()
 
-    cache = DNSCache(cfg.cache_file)
-    cache.load()
 
-    handler = RequestHandler(cfg, cache, Resolver(cfg))
+    handler = RequestHandler(cfg, Resolver(cfg))
     server = DNSServer(cfg, handler)
     server.start()
     log.info("DNS-сервер запущен на %s:%d", cfg.host, cfg.port)
@@ -144,7 +142,6 @@ def main() -> None:
     def shutdown(signum, _frame):
         log.info("Остановка (сигнал %d)...", signum)
         server.stop()
-        cache.save()
         sys.exit(0)
 
     signal.signal(signal.SIGINT, shutdown)

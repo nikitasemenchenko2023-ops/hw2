@@ -1,4 +1,3 @@
-
 import struct
 from dataclasses import dataclass, field
 from typing import Optional
@@ -9,7 +8,8 @@ from config import (
 )
 
 
-
+class DNSFormatError(Exception):
+    pass
 
 
 @dataclass
@@ -26,7 +26,7 @@ class DNSRecord:
     rclass: int
     ttl: int
     rdata: bytes
-    target: Optional[str] = None  
+    target: Optional[str] = None
 
     @property
     def address(self) -> Optional[str]:
@@ -67,13 +67,13 @@ def parse_qname(data: bytes, offset: int) -> tuple[str, int]:
                 next_offset, jumped = curr + 2, True
             ptr = struct.unpack("!H", data[curr:curr + 2])[0] & 0x3FFF
             if ptr in visited or ptr >= len(data):
-                raise Exception("битый compression-pointer")
+                raise DNSFormatError("битый compression-pointer")
             visited.add(ptr)
             curr = ptr
             continue
         curr += 1
         if curr + length > len(data):
-            raise Exception("метка за границей пакета")
+            raise DNSFormatError("метка за границей пакета")
         labels.append(data[curr:curr + length].decode("latin-1", "replace"))
         curr += length
     return ".".join(labels), next_offset
@@ -82,7 +82,7 @@ def parse_qname(data: bytes, offset: int) -> tuple[str, int]:
 def _parse_question(data: bytes, offset: int) -> tuple[DNSQuestion, int]:
     qname, offset = parse_qname(data, offset)
     if offset + 4 > len(data):
-        raise Exception("обрезанный вопрос")
+        raise DNSFormatError("обрезанный вопрос")
     qtype, qclass = struct.unpack("!HH", data[offset:offset + 4])
     return DNSQuestion(qname, qtype, qclass), offset + 4
 
@@ -90,24 +90,24 @@ def _parse_question(data: bytes, offset: int) -> tuple[DNSQuestion, int]:
 def _parse_record(data: bytes, offset: int) -> tuple[DNSRecord, int]:
     name, curr = parse_qname(data, offset)
     if curr + 10 > len(data):
-        raise Exception("обрезанная RR")
+        raise DNSFormatError("обрезанная RR")
     rtype, rclass, ttl, rdlen = struct.unpack("!HHIH", data[curr:curr + 10])
     curr += 10
     if curr + rdlen > len(data):
-        raise Exception("RDATA за границей пакета")
+        raise DNSFormatError("RDATA за границей пакета")
     rdata = data[curr:curr + rdlen]
     target = None
     if rtype in (TYPE_NS, TYPE_CNAME) and rdlen:
         try:
             target, _ = parse_qname(data, curr)
-        except Exception:
+        except DNSFormatError:
             pass
     return DNSRecord(name, rtype, rclass, ttl, rdata, target), curr + rdlen
 
 
 def parse_packet(data: bytes) -> DNSPacket:
     if len(data) < HEADER_LEN:
-        raise Exception("пакет меньше заголовка")
+        raise DNSFormatError("пакет меньше заголовка")
     req_id, flags, qd, an, ns, ar = struct.unpack("!HHHHHH", data[:HEADER_LEN])
     pkt = DNSPacket(req_id, flags)
     offset = HEADER_LEN
@@ -119,7 +119,6 @@ def parse_packet(data: bytes) -> DNSPacket:
             rr, offset = _parse_record(data, offset)
             bucket.append(rr)
     return pkt
-
 
 
 def encode_qname(name: str) -> bytes:
